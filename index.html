@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sistema de Inventário — Depósito</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f5f4f0;color:#1a1a1a;min-height:100vh;}
+
+/* ── LOGIN ── */
+.login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f5f4f0;}
+.login-card{background:#fff;border:0.5px solid #ddd;border-radius:16px;padding:2rem;width:340px;max-width:95vw;}
+.login-card h2{font-size:18px;font-weight:500;margin-bottom:6px;}
+.login-card p{font-size:12px;color:#888;margin-bottom:1.5rem;}
+.login-card label{font-size:12px;color:#666;display:block;margin-bottom:3px;margin-top:12px;}
+.login-card input{width:100%;padding:8px 12px;border:0.5px solid #ccc;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:#1a1a1a;}
+.login-card input:focus{outline:none;border-color:#999;}
+.login-btn{width:100%;margin-top:1.25rem;padding:10px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;}
+.login-btn:hover{background:#333;}
+.login-error{font-size:12px;color:#A32D2D;margin-top:8px;display:none;}
+
+/* ── TOPBAR ── */
+.topbar{background:#fff;border-bottom:0.5px solid #ddd;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;gap:12px;flex-wrap:wrap;}
+.topbar-left{display:flex;flex-direction:column;}
+.topbar-title{font-size:14px;font-weight:500;}
+.topbar-sub{font-size:11px;color:#888;margin-top:1px;}
+.topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.user-pill{font-size:11px;padding:3px 10px;border-radius:20px;background:#f0f0ec;border:0.5px solid #ddd;color:#444;}
+.user-pill span{font-weight:500;}
+.sync-status{font-size:11px;padding:3px 10px;border-radius:20px;border:0.5px solid #ddd;color:#888;background:#fff;white-space:nowrap;}
+.sync-status.ok{color:#27500A;border-color:#639922;background:#EAF3DE;}
+.sync-status.saving{color:#633806;border-color:#FAC775;background:#FAEEDA;}
+.sync-status.error{color:#A32D2D;border-color:#F7C1C1;background:#FCEBEB;}
+.logout-btn{font-size:11px;padding:3px 10px;border-radius:20px;border:0.5px solid #F7C1C1;background:#FCEBEB;color:#A32D2D;cursor:pointer;font-family:inherit;}
+
+/* ── CONTAINER ── */
+.app-screen{display:none;}
+.app-screen.visible{display:block;}
+.container{max-width:1400px;margin:0 auto;padding:1.25rem 1rem;}
+.tabs{display:flex;gap:6px;margin-bottom:1.25rem;flex-wrap:wrap;}
+.tab{padding:7px 14px;border:0.5px solid #ccc;border-radius:8px;background:transparent;color:#666;cursor:pointer;font-size:12px;font-family:inherit;}
+.tab.active{background:#f0f0ec;color:#1a1a1a;font-weight:500;border-color:#999;}
+.tab.hidden{display:none;}
+.panel{display:none;}.panel.active{display:block;}
+
+/* ── CONTROLS ── */
+.controls{display:flex;gap:10px;margin-bottom:1rem;align-items:center;flex-wrap:wrap;}
+.controls label{font-size:13px;color:#666;}
+.controls select,.controls input[type=number]{padding:6px 10px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;font-size:13px;font-family:inherit;}
+.btn{padding:6px 14px;border:0.5px solid #ccc;border-radius:8px;background:transparent;color:#666;cursor:pointer;font-size:12px;font-family:inherit;}
+.btn:hover{border-color:#999;color:#1a1a1a;}
+.btn.active{background:#E6F1FB;color:#0C447C;border-color:#378ADD;}
+.btn.success{background:#EAF3DE;color:#27500A;border-color:#639922;}
+.btn.danger{color:#A32D2D;border-color:#F7C1C1;background:#FCEBEB;}
+.btn.warning{background:#FAEEDA;color:#633806;border-color:#FAC775;}
+.btn.primary{background:#1a1a1a;color:#fff;border-color:#1a1a1a;}
+.btn.move-active{background:#FAEEDA;color:#633806;border-color:#BA7517;}
+.edit-bar{display:none;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem;padding:10px 12px;background:#f5f4f0;border-radius:8px;border:0.5px solid #ddd;}
+.edit-bar.visible{display:flex;}
+.edit-hint{font-size:11px;padding:4px 10px;border-radius:8px;}
+.hint-blue{color:#185FA5;background:#E6F1FB;}
+.hint-amber{color:#633806;background:#FAEEDA;}
+
+/* ── MAPA ── */
+.corredor-title{font-size:13px;font-weight:500;text-align:center;margin-bottom:8px;}
+.corredor-scroll{overflow-x:auto;border:0.5px solid #ddd;border-radius:8px;padding:10px 12px;background:#fff;}
+table.depot{border-collapse:separate;border-spacing:3px;}
+table.depot td{padding:0;vertical-align:bottom;}
+.nivel-lbl{font-size:10px;color:#888;padding-right:6px;white-space:nowrap;text-align:right;vertical-align:middle;min-width:28px;}
+.dupla{display:flex;gap:2px;}
+.pal-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.palete{width:32px;height:32px;border:0.5px solid #ddd;border-radius:3px;cursor:pointer;background:#fff;transition:border-color 0.1s,transform 0.1s;flex-shrink:0;position:relative;display:flex;align-items:center;justify-content:center;}
+.palete:hover{border-color:#999;}
+.palete.ocp{border:none;}
+.palete.edit-mode:hover{border-color:#378ADD;background:#E6F1FB;}
+.palete.portao{background:repeating-linear-gradient(45deg,#f5f5f5,#f5f5f5 3px,#e0e0e0 3px,#e0e0e0 6px);border:0.5px dashed #aaa;cursor:default;}
+.palete.move-mode{cursor:crosshair;}
+.palete.move-selected{border:2px solid #BA7517!important;background:#FAEEDA!important;transform:scale(1.08);}
+.palete.move-target{border:2px dashed #639922!important;background:#EAF3DE!important;}
+.palete.move-target:hover{background:#C0DD97!important;}
+.palete .status-dot{width:8px;height:8px;border-radius:50%;position:absolute;top:3px;right:3px;}
+.dot-trp{background:#BA7517;}.dot-desc{background:#A32D2D;}
+.pal-id{font-size:7.5px;color:#888;white-space:nowrap;text-align:center;line-height:1.2;}
+.gap-col{width:10px;}
+.cat-f{background:#B5D4F4;}.cat-c{background:#C0DD97;}.cat-b{background:#F5C4B3;}.cat-s{background:#FAC775;}
+.cat-cm{background:#EEEDFE;}.cat-bh{background:#9FE1CB;}.cat-op{background:#D3D1C7;}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#666;}
+.legend-dot{width:12px;height:12px;border-radius:2px;flex-shrink:0;}
+.legend-circle{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.move-bar{display:none;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:#FAEEDA;border:0.5px solid #FAC775;border-radius:8px;margin-bottom:1rem;}
+.move-bar.visible{display:flex;}
+.move-bar p{font-size:12px;color:#633806;flex:1;}
+
+/* ── MODALS ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff;border-radius:12px;border:0.5px solid #ddd;padding:1.25rem;width:340px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal.wide{width:520px;}
+.modal h3{font-size:15px;font-weight:500;margin-bottom:1rem;}
+.modal label{font-size:12px;color:#666;display:block;margin-bottom:3px;margin-top:10px;}
+.modal input,.modal select,.modal textarea{width:100%;padding:6px 10px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;font-size:13px;font-family:inherit;}
+.modal textarea{resize:vertical;min-height:55px;}
+.modal-btns{display:flex;gap:8px;margin-top:1rem;}
+.btn-p{flex:1;padding:8px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;}
+.btn-s{flex:1;padding:8px;background:transparent;color:#666;border:0.5px solid #ccc;border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;}
+.btn-d{padding:7px;background:transparent;color:#A32D2D;border:0.5px solid #F7C1C1;border-radius:8px;cursor:pointer;font-size:12px;margin-top:8px;width:100%;font-family:inherit;}
+.status-pills{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
+.status-pill{padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:0.5px solid transparent;}
+.pill-none{background:#f0f0ec;color:#666;border-color:#ddd;}
+.pill-none.sel{border-color:#999;color:#1a1a1a;}
+.pill-trp{background:#FAEEDA;color:#633806;border-color:#FAC775;}
+.pill-trp.sel{background:#FAC775;color:#412402;border-color:#BA7517;}
+.pill-desc{background:#FCEBEB;color:#791F1F;border-color:#F7C1C1;}
+.pill-desc.sel{background:#F7C1C1;color:#501313;border-color:#A32D2D;}
+.edit-modal-opts{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+.edit-opt{padding:10px 14px;border:0.5px solid #ccc;border-radius:8px;cursor:pointer;font-size:13px;color:#1a1a1a;background:#fff;text-align:left;font-family:inherit;}
+.edit-opt:hover{background:#f5f4f0;}
+.edit-opt.sel{border-color:#378ADD;background:#E6F1FB;color:#0C447C;}
+.edit-opt.danger{color:#A32D2D;border-color:#F7C1C1;}
+
+/* ── REPORTS ── */
+.summary-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:1.5rem;}
+@media(max-width:600px){.summary-cards{grid-template-columns:repeat(2,1fr);}}
+.s-card{background:#f5f4f0;border-radius:8px;padding:12px;}
+.s-label{font-size:11px;color:#888;margin-bottom:4px;}
+.s-val{font-size:22px;font-weight:500;}
+.s-sub{font-size:11px;color:#888;margin-top:2px;}
+.report-table{width:100%;border-collapse:collapse;font-size:12px;}
+.report-table th{text-align:left;padding:7px 8px;border-bottom:0.5px solid #ddd;font-weight:500;color:#888;font-size:11px;}
+.report-table td{padding:7px 8px;border-bottom:0.5px solid #eee;color:#1a1a1a;vertical-align:middle;}
+.report-table tr:last-child td{border-bottom:none;}
+.total-row td{background:#f5f4f0;font-weight:500;border-top:0.5px solid #ddd;border-bottom:none;}
+.cat-badge{font-size:10px;padding:2px 6px;border-radius:3px;display:inline-block;}
+.empty-state{text-align:center;padding:2rem;color:#888;font-size:13px;}
+.search-box{padding:6px 10px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;font-size:13px;width:160px;font-family:inherit;}
+.section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px;}
+.trp-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:#FAEEDA;color:#633806;border:0.5px solid #FAC775;}
+.desc-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:#FCEBEB;color:#791F1F;border:0.5px solid #F7C1C1;}
+.approve-btn{padding:4px 10px;border:0.5px solid #639922;background:#EAF3DE;color:#27500A;border-radius:8px;cursor:pointer;font-size:11px;font-family:inherit;}
+.discard-btn{padding:4px 10px;border:0.5px solid #F7C1C1;background:#FCEBEB;color:#791F1F;border-radius:8px;cursor:pointer;font-size:11px;font-family:inherit;}
+input[type=checkbox]{width:15px;height:15px;cursor:pointer;}
+.bulk-bar{display:none;gap:8px;align-items:center;padding:8px 12px;background:#f5f4f0;border-radius:8px;border:0.5px solid #ddd;margin-bottom:1rem;flex-wrap:wrap;}
+.bulk-bar.visible{display:flex;}
+.filter-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center;}
+.filter-row select{padding:5px 10px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;font-size:12px;font-family:inherit;}
+.export-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;}
+
+/* ── DB PANEL ── */
+.db-cat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem;}
+.db-cat-tab{padding:5px 12px;border:0.5px solid #ccc;border-radius:20px;font-size:12px;cursor:pointer;color:#666;background:transparent;font-family:inherit;}
+.db-cat-tab.active{font-weight:500;color:#1a1a1a;border-color:#999;background:#f0f0ec;}
+.db-section{background:#fff;border:0.5px solid #ddd;border-radius:12px;padding:1rem;margin-bottom:1rem;}
+.db-section-title{font-size:13px;font-weight:500;margin-bottom:0.75rem;display:flex;align-items:center;justify-content:space-between;}
+.db-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0.75rem;min-height:32px;}
+.db-tag{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:12px;border:0.5px solid #ddd;background:#f5f4f0;color:#1a1a1a;}
+.db-tag-del{cursor:pointer;color:#888;font-size:14px;line-height:1;padding:0 2px;}
+.db-tag-del:hover{color:#A32D2D;}
+.db-add-row{display:flex;gap:6px;align-items:center;}
+.db-add-row input{padding:5px 10px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;font-size:13px;flex:1;font-family:inherit;}
+.db-empty{font-size:12px;color:#888;padding:6px 0;}
+.import-area{border:0.5px dashed #ccc;border-radius:8px;padding:1rem;text-align:center;margin-bottom:0.75rem;cursor:pointer;transition:border-color 0.15s;}
+.import-area:hover{border-color:#999;}
+.import-area p{font-size:13px;color:#666;margin-bottom:6px;}
+.import-area small{font-size:11px;color:#888;}
+.import-preview{background:#f5f4f0;border-radius:8px;padding:10px;margin-top:8px;font-size:12px;color:#666;max-height:120px;overflow-y:auto;}
+.warn-box{background:#FAEEDA;border:0.5px solid #FAC775;border-radius:8px;padding:10px 14px;font-size:12px;color:#633806;margin-bottom:1rem;}
+
+/* ── ADMIN ── */
+.user-table{width:100%;border-collapse:collapse;font-size:12px;}
+.user-table th{text-align:left;padding:7px 8px;border-bottom:0.5px solid #ddd;font-weight:500;color:#888;font-size:11px;}
+.user-table td{padding:7px 8px;border-bottom:0.5px solid #eee;color:#1a1a1a;vertical-align:middle;}
+.user-table tr:last-child td{border-bottom:none;}
+.perfil-badge{font-size:10px;padding:2px 8px;border-radius:20px;display:inline-block;}
+.badge-admin{background:#EEEDFE;color:#3C3489;}
+.badge-chefe{background:#E6F1FB;color:#0C447C;}
+.badge-operador{background:#f5f4f0;color:#666;border:0.5px solid #ddd;}
+.corredor-check-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.corredor-check{display:flex;align-items:center;gap:4px;font-size:12px;padding:3px 8px;border:0.5px solid #ddd;border-radius:6px;cursor:pointer;background:#f5f4f0;}
+.corredor-check.checked{background:#E6F1FB;border-color:#378ADD;color:#0C447C;}
+
+/* ── BACKUP ── */
+.backup-list{display:flex;flex-direction:column;gap:8px;}
+.backup-item{background:#fff;border:0.5px solid #ddd;border-radius:8px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.backup-info{flex:1;}
+.backup-date{font-size:13px;font-weight:500;}
+.backup-desc{font-size:11px;color:#888;margin-top:2px;}
+.backup-actions{display:flex;gap:6px;}
+
+/* ── LOADING ── */
+.loading-overlay{display:flex;position:fixed;inset:0;background:rgba(255,255,255,0.92);z-index:200;align-items:center;justify-content:center;flex-direction:column;gap:12px;}
+.loading-overlay p{font-size:14px;color:#666;}
+.spinner{width:32px;height:32px;border:2px solid #ddd;border-top-color:#1a1a1a;border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <p>Carregando...</p>
+</div>
+
+<!-- ══ TELA DE LOGIN ══════════════════════════════════════════ -->
+<div class="login-screen" id="loginScreen" style="display:none;">
+  <div class="login-card">
+    <h2>Sistema de Inventário</h2>
+    <p>Depósito de materiais — faça login para continuar</p>
+    <label>Login</label>
+    <input type="text" id="loginInput" placeholder="seu login" autocomplete="username"/>
+    <label>Senha</label>
+    <input type="password" id="senhaInput" placeholder="sua senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <button class="login-btn" onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="loginError">Login ou senha incorretos.</div>
+  </div>
+</div>
+
+<!-- ══ APP ════════════════════════════════════════════════════ -->
+<div class="app-screen" id="appScreen">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title">Sistema de Inventário</div>
+      <div class="topbar-sub">Depósito · 10 corredores · 108 conjuntos · 216 paletes/corredor</div>
+    </div>
+    <div class="topbar-right">
+      <span class="user-pill">Olá, <span id="userNameDisplay">—</span> · <span id="userPerfilDisplay">—</span></span>
+      <span class="sync-status" id="syncStatus">Conectando...</span>
+      <button class="logout-btn" onclick="doLogout()">Sair</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab active" onclick="showPanel('mapa',event)">Mapa</button>
+      <button class="tab" onclick="showPanel('inventario',event)">Inventário</button>
+      <button class="tab" onclick="showPanel('trp',event)">TRP</button>
+      <button class="tab" onclick="showPanel('descarga',event)">Descarga</button>
+      <button class="tab" id="tabDb" onclick="showPanel('db',event)">Banco de dados</button>
+      <button class="tab" id="tabAdmin" onclick="showPanel('admin',event)">Administração</button>
+      <button class="tab" id="tabBackup" onclick="showPanel('backup',event)">Backup</button>
+    </div>
+
+    <!-- MAPA -->
+    <div id="panel-mapa" class="panel active">
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#B5D4F4"></span>Fardamento</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#C0DD97"></span>Calçados</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#F5C4B3"></span>Balístico</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#FAC775"></span>Salinha</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#EEEDFE"></span>Cama</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#9FE1CB"></span>Banho</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#D3D1C7"></span>Operacional</span>
+        <span class="legend-item"><span class="legend-circle" style="background:#BA7517"></span>TRP</span>
+        <span class="legend-item"><span class="legend-circle" style="background:#A32D2D"></span>Descarga</span>
+      </div>
+      <div class="controls">
+        <label>Corredor:</label>
+        <select id="selCorredor" onchange="renderCorredor()">
+          <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
+          <option>F</option><option>G</option><option>H</option><option>I</option><option>J</option>
+        </select>
+        <button class="btn" id="btnEdit" onclick="toggleEdit()">Edição livre</button>
+        <button class="btn" id="btnMove" onclick="toggleMoveMode()">Mover paletes</button>
+      </div>
+
+      <!-- barra edição livre -->
+      <div class="edit-bar" id="editBar">
+        <span class="edit-hint hint-blue">Modo edição ativo — clique para marcar portão</span>
+        <label>Colunas:</label>
+        <input type="number" id="nCols" min="1" max="60" value="27" style="width:60px;padding:5px 8px;border:0.5px solid #ccc;border-radius:8px;font-size:13px;"/>
+        <button class="btn" onclick="applyCols()">Aplicar</button>
+        <button class="btn" onclick="addColEnd()">+ coluna</button>
+        <button class="btn danger" onclick="removeColEnd()">− coluna</button>
+      </div>
+
+      <!-- barra mover paletes -->
+      <div class="move-bar" id="moveBar">
+        <p id="moveStatus">Clique em um palete para selecionar. Depois clique no destino para mover ou trocar.</p>
+        <button class="btn success" onclick="confirmMove()">Confirmar alterações</button>
+        <button class="btn danger" onclick="cancelMove()">Cancelar</button>
+      </div>
+
+      <div id="corredorView"></div>
+      <p style="font-size:11px;color:#888;margin-top:8px;">Laranja = TRP · Vermelho = Descarga</p>
+    </div>
+
+    <!-- INVENTÁRIO -->
+    <div id="panel-inventario" class="panel">
+      <div class="summary-cards" id="summaryCards"></div>
+      <div class="export-row">
+        <button class="btn" onclick="exportTable('inv')">Exportar CSV</button>
+        <button class="btn" onclick="exportTable('inv','xlsx')">Exportar Excel</button>
+      </div>
+      <div class="filter-row">
+        <select id="fInvCat" onchange="filterInv()"><option value="">Todas as categorias</option></select>
+        <select id="fInvItem" onchange="filterInv()"><option value="">Todos os itens</option></select>
+        <select id="fInvTam" onchange="filterInv()"><option value="">Todos os tamanhos</option></select>
+        <input class="search-box" type="text" placeholder="Buscar..." id="searchInv" oninput="filterInv()"/>
+        <button class="btn" onclick="clearInvFilters()">✕ Limpar filtros</button>
+      </div>
+      <table class="report-table">
+        <thead><tr><th>Identificação</th><th>Categoria</th><th>Item</th><th>Tamanho</th><th>Qtd.</th><th>Obs.</th></tr></thead>
+        <tbody id="invBody"></tbody>
+        <tfoot id="invFoot"></tfoot>
+      </table>
+    </div>
+
+    <!-- TRP -->
+    <div id="panel-trp" class="panel">
+      <div class="bulk-bar" id="trpBulkBar">
+        <span style="font-size:12px;color:#666" id="trpBulkCount">0 selecionados</span>
+        <button class="approve-btn" onclick="approveSelected()">Aprovar selecionados → inventário</button>
+      </div>
+      <div class="export-row">
+        <button class="btn" onclick="exportTable('trp')">Exportar CSV</button>
+        <button class="btn" onclick="exportTable('trp','xlsx')">Exportar Excel</button>
+      </div>
+      <div class="section-hdr">
+        <span style="font-size:13px;font-weight:500;">TRP <span class="trp-badge">aguardando autorização</span></span>
+        <input class="search-box" type="text" placeholder="Buscar..." id="searchTrp" oninput="filterTrp()"/>
+      </div>
+      <table class="report-table">
+        <thead><tr><th><input type="checkbox" id="trpSelectAll" onchange="toggleSelectAll()"/></th><th>Identificação</th><th>Categoria</th><th>Item</th><th>Tamanho</th><th>Qtd.</th><th>Obs.</th><th></th></tr></thead>
+        <tbody id="trpBody"></tbody>
+      </table>
+    </div>
+
+    <!-- DESCARGA -->
+    <div id="panel-descarga" class="panel">
+      <div class="export-row">
+        <button class="btn" onclick="exportTable('desc')">Exportar CSV</button>
+        <button class="btn" onclick="exportTable('desc','xlsx')">Exportar Excel</button>
+      </div>
+      <div class="section-hdr">
+        <span style="font-size:13px;font-weight:500;">Descarga <span class="desc-badge">aguardando autorização</span></span>
+        <input class="search-box" type="text" placeholder="Buscar..." id="searchDesc" oninput="filterDesc()"/>
+      </div>
+      <table class="report-table">
+        <thead><tr><th>Identificação</th><th>Categoria</th><th>Item</th><th>Tamanho</th><th>Qtd.</th><th>Obs.</th><th></th></tr></thead>
+        <tbody id="descBody"></tbody>
+      </table>
+    </div>
+
+    <!-- BANCO DE DADOS -->
+    <div id="panel-db" class="panel">
+      <div class="warn-box">Todas as edições exigem confirmação. Remover item/tamanho não apaga dados já cadastrados.</div>
+      <div class="db-cat-tabs" id="dbCatTabs"></div>
+      <div class="db-section">
+        <div class="db-section-title">Itens — <span id="dbCatName" style="color:#888;font-weight:400"></span></div>
+        <div class="db-list" id="dbItemList"></div>
+        <div class="db-add-row">
+          <input type="text" id="dbNewItem" placeholder="Novo item..." onkeydown="if(event.key==='Enter')addDbItem()"/>
+          <button class="btn success" onclick="addDbItem()">Adicionar</button>
+        </div>
+      </div>
+      <div class="db-section">
+        <div class="db-section-title">Tamanhos — <span id="dbCatName2" style="color:#888;font-weight:400"></span></div>
+        <div class="db-list" id="dbTamList"></div>
+        <div class="db-add-row">
+          <input type="text" id="dbNewTam" placeholder="Novo tamanho..." onkeydown="if(event.key==='Enter')addDbTam()"/>
+          <button class="btn success" onclick="addDbTam()">Adicionar</button>
+        </div>
+      </div>
+      <div class="db-section">
+        <div class="db-section-title">Importar planilha (CSV / Excel)</div>
+        <div class="import-area" onclick="document.getElementById('csvFile').click()">
+          <p>Clique para selecionar arquivo CSV ou Excel (.xlsx)</p>
+          <small>Colunas: "categoria", "item" e opcionalmente "tamanho"</small>
+          <input type="file" id="csvFile" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleImport(event)"/>
+        </div>
+        <div id="importPreview" style="display:none" class="import-preview"></div>
+        <div id="importActions" style="display:none;gap:8px;margin-top:8px;">
+          <button class="btn success" onclick="confirmImport()">Confirmar importação</button>
+          <button class="btn danger" onclick="cancelImport()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMINISTRAÇÃO -->
+    <div id="panel-admin" class="panel">
+      <div class="section-hdr">
+        <span style="font-size:13px;font-weight:500;">Usuários do sistema</span>
+        <button class="btn primary" onclick="openNewUserModal()">+ Novo usuário</button>
+      </div>
+      <table class="user-table">
+        <thead><tr><th>Login</th><th>Perfil</th><th>Corredores</th><th>Situação</th><th></th></tr></thead>
+        <tbody id="userTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- BACKUP -->
+    <div id="panel-backup" class="panel">
+      <div class="section-hdr">
+        <span style="font-size:13px;font-weight:500;">Backups do sistema</span>
+        <button class="btn primary" onclick="createBackup('manual')">Criar backup agora</button>
+      </div>
+      <p style="font-size:12px;color:#888;margin-bottom:1rem;">Backups diários são criados automaticamente ao abrir o sistema. Os 30 últimos backups são mantidos.</p>
+      <div class="backup-list" id="backupList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- modal palete -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle"></h3>
+    <label>Categoria</label>
+    <select id="mCat" onchange="onCatChange()">
+      <option value="">— selecione —</option>
+      <option value="f">Fardamento</option><option value="c">Calçados</option>
+      <option value="b">Material balístico</option><option value="s">Material da salinha</option>
+      <option value="cm">Cama</option><option value="bh">Banho</option><option value="op">Operacional</option>
+    </select>
+    <label>Item</label>
+    <select id="mItem" onchange="onItemChange()"><option value="">— selecione a categoria primeiro —</option></select>
+    <label>Tamanho / numeração</label>
+    <select id="mTam"><option value="">— selecione —</option></select>
+    <label>Quantidade</label>
+    <input type="number" id="mQtd" min="0" placeholder="0"/>
+    <label>Situação</label>
+    <div class="status-pills">
+      <span class="status-pill pill-none sel" onclick="selStatus('none',this)">Normal</span>
+      <span class="status-pill pill-trp" onclick="selStatus('trp',this)">TRP</span>
+      <span class="status-pill pill-desc" onclick="selStatus('desc',this)">Descarga</span>
+    </div>
+    <label>Observações</label>
+    <textarea id="mObs" placeholder="Anotações adicionais..."></textarea>
+    <div class="modal-btns">
+      <button class="btn-s" onclick="closeModal()">Cancelar</button>
+      <button class="btn-p" onclick="saveP()">Salvar</button>
+    </div>
+    <button class="btn-d" onclick="clearP()">Limpar palete</button>
+  </div>
+</div>
+
+<!-- modal edição livre -->
+<div class="modal-bg" id="editModalBg">
+  <div class="modal">
+    <h3 id="editModalTitle"></h3>
+    <div class="edit-modal-opts">
+      <button class="edit-opt" id="optPortao" onclick="setPortao()">Marcar como portão / passagem</button>
+      <button class="edit-opt" id="optPalete" onclick="setPalete()">Restaurar como palete normal</button>
+      <button class="edit-opt danger" onclick="closeEditModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- modal novo/editar usuário -->
+<div class="modal-bg" id="userModalBg">
+  <div class="modal wide">
+    <h3 id="userModalTitle">Novo usuário</h3>
+    <input type="hidden" id="editUserId"/>
+    <label>Login</label>
+    <input type="text" id="uLogin" placeholder="nome de login único"/>
+    <label>Senha <span id="senhaHint" style="font-size:11px;color:#888">(deixe vazio para não alterar)</span></label>
+    <input type="password" id="uSenha" placeholder="mínimo 6 caracteres"/>
+    <label>Perfil</label>
+    <select id="uPerfil" onchange="toggleCorredoresSection()">
+      <option value="operador">Operador</option>
+      <option value="chefe">Chefe de corredor</option>
+      <option value="admin">Admin</option>
+    </select>
+    <div id="corredoresSection" style="display:none;margin-top:12px;">
+      <label style="margin-top:0">Corredores permitidos</label>
+      <div class="corredor-check-grid" id="corredorChecks"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-s" onclick="closeUserModal()">Cancelar</button>
+      <button class="btn-p" onclick="saveUser()">Salvar</button>
+    </div>
+    <button class="btn-d" id="deactivateUserBtn" onclick="toggleUserActive()" style="display:none">Desativar usuário</button>
+  </div>
+</div>
+
+<!-- modal confirmar troca de paletes -->
+<div class="modal-bg" id="swapModalBg">
+  <div class="modal">
+    <h3>Confirmar movimentação</h3>
+    <p style="font-size:13px;color:#666;margin-top:8px;" id="swapDesc"></p>
+    <div class="modal-btns" style="margin-top:1rem;">
+      <button class="btn-s" onclick="document.getElementById('swapModalBg').classList.remove('open')">Cancelar</button>
+      <button class="btn-p" onclick="executeSwap()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// SUPABASE
+// ══════════════════════════════════════════════════════════════
+const URL_BASE = 'https://vwjthlgcivncvjdnjbsk.supabase.co/rest/v1';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3anRobGdjaXZuY3ZqZG5qYnNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5MTc1MDAsImV4cCI6MjA5MDQ5MzUwMH0.i5_WOadffnDmXT8w6-s03vsYHp1qOvMSAFwHE4v5KHI';
+const HR = { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY };
+const HW = { ...HR, 'Content-Type': 'application/json' };
+
+async function sbSelect(table, q='') {
+  const r = await fetch(`${URL_BASE}/${table}?${q}`, { headers: HR });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbUpsert(table, data) {
+  const r = await fetch(`${URL_BASE}/${table}`, {
+    method: 'POST', headers: { ...HW, 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
+async function sbInsert(table, data) {
+  const r = await fetch(`${URL_BASE}/${table}`, {
+    method: 'POST', headers: { ...HW, 'Prefer': 'return=representation' },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbPatch(table, q, data) {
+  const r = await fetch(`${URL_BASE}/${table}?${q}`, {
+    method: 'PATCH', headers: { ...HW, 'Prefer': 'return=minimal' },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) throw new Error(await r.text());
+}
+async function sbDelete(table, q) {
+  const r = await fetch(`${URL_BASE}/${table}?${q}`, { method: 'DELETE', headers: HR });
+  if (!r.ok) throw new Error(await r.text());
+}
+
+function setSyncStatus(state, msg) {
+  const el = document.getElementById('syncStatus');
+  el.className = 'sync-status ' + state;
+  el.textContent = msg;
+}
+
+// ══════════════════════════════════════════════════════════════
+// SHA-256 (para senhas — sem enviar ao servidor)
+// ══════════════════════════════════════════════════════════════
+async function sha256(msg) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════════════════════════════
+const NROWS = 4;
+const catInfo = {
+  f:  { label:'Fardamento',  bg:'#B5D4F4', text:'#0C447C', cls:'cat-f'  },
+  c:  { label:'Calçados',    bg:'#C0DD97', text:'#27500A', cls:'cat-c'  },
+  b:  { label:'Balístico',   bg:'#F5C4B3', text:'#712B13', cls:'cat-b'  },
+  s:  { label:'Salinha',     bg:'#FAC775', text:'#633806', cls:'cat-s'  },
+  cm: { label:'Cama',        bg:'#EEEDFE', text:'#3C3489', cls:'cat-cm' },
+  bh: { label:'Banho',       bg:'#9FE1CB', text:'#085041', cls:'cat-bh' },
+  op: { label:'Operacional', bg:'#D3D1C7', text:'#2C2C2A', cls:'cat-op' }
+};
+
+let db = {}; Object.keys(catInfo).forEach(k => { db[k] = { items:[], tamanhos:[] }; });
+let layouts = {}, depot = {};
+let curKey = null, curEditKey = null;
+let editMode = false, curStatus = 'none';
+let trpSelected = new Set();
+let dbActiveCat = 'f', importBuffer = [];
+
+// sessão
+let currentUser = null; // { id, login, perfil, corredores_permitidos }
+
+// mover paletes
+let moveMode = false;
+let moveSource = null; // key do palete selecionado
+let movePending = []; // [{from, to, dataFrom, dataTo}]
+
+// ══════════════════════════════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════════════════════════════
+async function doLogin() {
+  const login = document.getElementById('loginInput').value.trim();
+  const senha = document.getElementById('senhaInput').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+  if (!login || !senha) { errEl.textContent = 'Preencha login e senha.'; errEl.style.display = 'block'; return; }
+  try {
+    const hash = await sha256(senha);
+    const users = await sbSelect('usuarios', `login=eq.${encodeURIComponent(login)}&senha_hash=eq.${hash}&ativo=eq.true&select=*`);
+    if (!users.length) { errEl.textContent = 'Login ou senha incorretos.'; errEl.style.display = 'block'; return; }
+    currentUser = users[0];
+    currentUser.corredores_permitidos = Array.isArray(currentUser.corredores_permitidos) ? currentUser.corredores_permitidos : [];
+    startApp();
+  } catch(e) {
+    errEl.textContent = 'Erro de conexão. Tente novamente.';
+    errEl.style.display = 'block';
+    console.error(e);
+  }
+}
+
+function doLogout() {
+  currentUser = null; moveMode = false; moveSource = null; movePending = [];
+  document.getElementById('loginInput').value = '';
+  document.getElementById('senhaInput').value = '';
+  document.getElementById('appScreen').classList.remove('visible');
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+function startApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appScreen').classList.add('visible');
+  document.getElementById('userNameDisplay').textContent = currentUser.login;
+  document.getElementById('userPerfilDisplay').textContent = currentUser.perfil;
+  applyPermissions();
+  loadAll();
+}
+
+function applyPermissions() {
+  const p = currentUser.perfil;
+  // Admin vê tudo; operador e chefe não veem aba Admin
+  document.getElementById('tabAdmin').classList.toggle('hidden', p !== 'admin');
+  document.getElementById('tabDb').classList.toggle('hidden', p === 'operador');
+  document.getElementById('tabBackup').classList.toggle('hidden', p === 'operador');
+  // botão edição e mover só para admin e chefe
+  document.getElementById('btnEdit').style.display = (p === 'operador') ? 'none' : '';
+  document.getElementById('btnMove').style.display = (p === 'operador') ? 'none' : '';
+}
+
+function canEditCorredor(cor) {
+  if (currentUser.perfil === 'admin') return true;
+  if (currentUser.perfil === 'chefe') return currentUser.corredores_permitidos.includes(cor);
+  return false; // operador: só leitura
+}
+
+// ══════════════════════════════════════════════════════════════
+// CARREGAR DADOS
+// ══════════════════════════════════════════════════════════════
+async function loadAll() {
+  try {
+    setSyncStatus('saving', 'Carregando...');
+    const [paletes, lays, itens] = await Promise.all([
+      sbSelect('paletes', 'select=*'),
+      sbSelect('layouts', 'select=*'),
+      sbSelect('banco_itens', 'select=*&order=valor.asc')
+    ]);
+    depot = {};
+    paletes.forEach(p => { depot[p.id] = { cat:p.cat, item:p.item||'', tam:p.tam||'', qtd:p.qtd||0, obs:p.obs||'', status:p.status||'none' }; });
+    layouts = {};
+    lays.forEach(l => { layouts[l.corredor] = { ncols:l.ncols||27, portoes:new Set(Array.isArray(l.portoes)?l.portoes:[]) }; });
+    db = {}; Object.keys(catInfo).forEach(k => { db[k] = { items:[], tamanhos:[] }; });
+    itens.forEach(i => { if(db[i.cat]) { if(i.tipo==='item') db[i.cat].items.push(i.valor); else if(i.tipo==='tamanho') db[i.cat].tamanhos.push(i.valor); } });
+    setSyncStatus('ok', 'Conectado');
+    document.getElementById('loadingOverlay').style.display = 'none';
+    renderCorredor();
+    buildAllReports();
+    checkDailyBackup();
+  } catch(e) {
+    setSyncStatus('error', 'Erro de conexão');
+    document.getElementById('loadingOverlay').innerHTML = `<p style="color:#A32D2D;font-size:14px;text-align:center;">Erro ao conectar.<br><small>${e.message}</small><br><br><button onclick="loadAll()" style="padding:8px 16px;border:0.5px solid #ccc;border-radius:8px;cursor:pointer;font-family:inherit;">Tentar novamente</button></p>`;
+    console.error(e);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════
+function getLayout(cor) { if(!layouts[cor]) layouts[cor]={ncols:27,portoes:new Set()}; return layouts[cor]; }
+function pad(n) { return String(n).padStart(2,'0'); }
+function conjNum(col,row) { return col*4+(3-row); }
+function makeKey(cor,conj,pos) { return `${cor}_${pad(conj)}_P${pos}`; }
+function makeLabel(cor,conj,pos) { return `${cor} ${pad(conj)}.${pos}`; }
+function portaoKey(col,row) { return `${col}_${row}`; }
+function getCor() { return document.getElementById('selCorredor').value; }
+function fmtLabel(k) { const p=k.split('_'); return `${p[0]} ${p[1]}.${p[2].replace('P','')}`; }
+function catBadge(d) { if(!catInfo[d.cat]) return d.cat||'—'; const v=catInfo[d.cat]; return `<span class="cat-badge" style="background:${v.bg};color:${v.text}">${v.label}</span>`; }
+
+// ══════════════════════════════════════════════════════════════
+// SALVAR / DELETAR PALETE
+// ══════════════════════════════════════════════════════════════
+async function savePaleteToDB(key, data) {
+  if(!key || typeof key !== 'string') { console.error('savePaleteToDB: key inválida', key); return; }
+  setSyncStatus('saving', 'Salvando...');
+  try {
+    const parts = key.split('_');
+    await sbUpsert('paletes', {
+      id:key, corredor:parts[0], conj:parts[1], pos:parseInt(parts[2].replace('P','')),
+      cat:data.cat||null, item:data.item||null, tam:data.tam||null,
+      qtd:data.qtd||0, obs:data.obs||'', status:data.status||'none'
+    });
+    setSyncStatus('ok', 'Salvo');
+  } catch(e) { setSyncStatus('error','Erro ao salvar'); alert('Erro ao salvar:\n'+e.message); console.error(e); }
+}
+
+async function deletePaletFromDB(key) {
+  setSyncStatus('saving','Removendo...');
+  try { await sbDelete('paletes',`id=eq.${encodeURIComponent(key)}`); setSyncStatus('ok','Salvo'); }
+  catch(e) { setSyncStatus('error','Erro ao remover'); console.error(e); }
+}
+
+async function updateStatusDB(key, status) {
+  try { await sbPatch('paletes',`id=eq.${encodeURIComponent(key)}`,{status}); } catch(e) { console.error(e); }
+}
+
+async function saveLayoutToDB(cor) {
+  try { const l=getLayout(cor); await sbUpsert('layouts',{corredor:cor,ncols:l.ncols,portoes:[...l.portoes]}); } catch(e) { console.error(e); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// MAPA — RENDERIZAR
+// ══════════════════════════════════════════════════════════════
+function renderCorredor() {
+  const cor = getCor(), lay = getLayout(cor);
+  document.getElementById('nCols').value = lay.ncols;
+  const canEdit = canEditCorredor(cor);
+  let html = `<div class="corredor-title">CORREDOR ${cor}</div><div class="corredor-scroll"><table class="depot"><tbody>`;
+  for(let row=0; row<NROWS; row++) {
+    const nivel = 3-row;
+    html += `<tr><td class="nivel-lbl">N${String(nivel).padStart(2,'0')}</td>`;
+    for(let col=0; col<lay.ncols; col++) {
+      const conj = conjNum(col,row), isPortao = lay.portoes.has(portaoKey(col,row));
+      if(col>0 && col%2===0) html += `<td class="gap-col"></td>`;
+      html += `<td><div class="dupla">`;
+      for(let pos=1; pos<=2; pos++) {
+        const k = makeKey(cor,conj,pos), d = depot[k];
+        if(isPortao) {
+          html += `<div class="pal-wrap"><div class="palete portao${canEdit&&editMode?' edit-mode':''}" onclick="${canEdit&&editMode?`openEditModal('${cor}',${col},${row})`:''}" title="Portão"></div><div class="pal-id" style="color:#aaa">portão</div></div>`;
+        } else {
+          const cls = d ? 'ocp '+catInfo[d.cat].cls : '';
+          const dot = d&&d.status==='trp' ? '<span class="status-dot dot-trp"></span>' : d&&d.status==='desc' ? '<span class="status-dot dot-desc"></span>' : '';
+          let palCls = `palete ${cls}`;
+          let action = '';
+          if(moveMode && canEdit) {
+            palCls += ' move-mode';
+            if(moveSource===k) palCls += ' move-selected';
+            else if(moveSource && !d) palCls += ' move-target';
+            else if(moveSource && d) palCls += ' move-target';
+            action = `onClickMove('${k}')`;
+          } else if(editMode && canEdit) {
+            palCls += ' edit-mode';
+            action = `openEditModal('${cor}',${col},${row})`;
+          } else if(canEdit) {
+            action = `openModal('${cor}',${conj},${pos})`;
+          }
+          const tooltip = makeLabel(cor,conj,pos)+(d?' — '+catInfo[d.cat].label+(d.item?' | '+d.item:''):'');
+          html += `<div class="pal-wrap"><div class="${palCls}" onclick="${action}" title="${tooltip}">${dot}</div><div class="pal-id">${makeLabel(cor,conj,pos)}</div></div>`;
+        }
+      }
+      html += `</div></td>`;
+    }
+    html += `</tr>`;
+  }
+  html += `</tbody></table></div>`;
+  document.getElementById('corredorView').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════
+// EDIÇÃO LIVRE
+// ══════════════════════════════════════════════════════════════
+function toggleEdit() {
+  if(moveMode) toggleMoveMode();
+  editMode = !editMode;
+  document.getElementById('btnEdit').classList.toggle('active', editMode);
+  document.getElementById('editBar').classList.toggle('visible', editMode);
+  renderCorredor();
+}
+function applyCols() { const cor=getCor(); getLayout(cor).ncols=Math.max(1,Math.min(60,parseInt(document.getElementById('nCols').value)||27)); saveLayoutToDB(cor); renderCorredor(); }
+function addColEnd() { const cor=getCor(); getLayout(cor).ncols=Math.min(60,getLayout(cor).ncols+1); document.getElementById('nCols').value=getLayout(cor).ncols; saveLayoutToDB(cor); renderCorredor(); }
+function removeColEnd() { const cor=getCor(); const l=getLayout(cor); if(l.ncols<=1)return; l.ncols--; document.getElementById('nCols').value=l.ncols; saveLayoutToDB(cor); renderCorredor(); }
+function openEditModal(cor,col,row) {
+  curEditKey={cor,col,row};
+  const isPortao=getLayout(cor).portoes.has(portaoKey(col,row));
+  document.getElementById('editModalTitle').textContent=`${cor} ${pad(conjNum(col,row))} — N${3-row}`;
+  document.getElementById('optPortao').classList.toggle('sel',isPortao);
+  document.getElementById('optPalete').classList.toggle('sel',!isPortao);
+  document.getElementById('editModalBg').classList.add('open');
+}
+function closeEditModal() { document.getElementById('editModalBg').classList.remove('open'); curEditKey=null; }
+function setPortao() { if(!curEditKey)return; getLayout(curEditKey.cor).portoes.add(portaoKey(curEditKey.col,curEditKey.row)); saveLayoutToDB(curEditKey.cor); closeEditModal(); renderCorredor(); }
+function setPalete() { if(!curEditKey)return; getLayout(curEditKey.cor).portoes.delete(portaoKey(curEditKey.col,curEditKey.row)); saveLayoutToDB(curEditKey.cor); closeEditModal(); renderCorredor(); }
+
+// ══════════════════════════════════════════════════════════════
+// MOVER PALETES
+// ══════════════════════════════════════════════════════════════
+function toggleMoveMode() {
+  if(editMode) toggleEdit();
+  moveMode = !moveMode;
+  moveSource = null;
+  movePending = [];
+  document.getElementById('btnMove').classList.toggle('move-active', moveMode);
+  document.getElementById('moveBar').classList.toggle('visible', moveMode);
+  if(!moveMode) document.getElementById('moveStatus').textContent = 'Clique em um palete para selecionar. Depois clique no destino para mover ou trocar.';
+  renderCorredor();
+}
+
+function onClickMove(key) {
+  if(!moveMode) return;
+  if(!moveSource) {
+    // selecionar origem (pode ser palete vazio ou com item)
+    moveSource = key;
+    document.getElementById('moveStatus').textContent = `Selecionado: ${fmtLabel(key)}${depot[key]?' ('+catInfo[depot[key].cat]?.label+')':' (vazio)'}. Clique no destino.`;
+    renderCorredor();
+  } else {
+    if(moveSource === key) {
+      // clicou no mesmo: desseleciona
+      moveSource = null;
+      document.getElementById('moveStatus').textContent = 'Seleção cancelada. Clique em um palete para selecionar.';
+      renderCorredor();
+      return;
+    }
+    // definir troca/mover
+    const fromData = depot[moveSource] ? {...depot[moveSource]} : null;
+    const toData = depot[key] ? {...depot[key]} : null;
+    const fromLabel = fmtLabel(moveSource);
+    const toLabel = fmtLabel(key);
+    const desc = toData
+      ? `Trocar ${fromLabel} ↔ ${toLabel}?`
+      : `Mover ${fromLabel} → ${toLabel}?`;
+    document.getElementById('swapDesc').textContent = desc;
+    // guardar operação pendente
+    window._pendingSwap = { from: moveSource, to: key, fromData, toData };
+    document.getElementById('swapModalBg').classList.add('open');
+  }
+}
+
+function executeSwap() {
+  document.getElementById('swapModalBg').classList.remove('open');
+  const {from, to, fromData, toData} = window._pendingSwap;
+  // aplicar localmente
+  if(fromData) depot[to] = fromData; else delete depot[to];
+  if(toData) depot[from] = toData; else delete depot[from];
+  // registrar para salvar depois
+  movePending.push({ from, to, fromData, toData });
+  moveSource = null;
+  document.getElementById('moveStatus').textContent = `Movimentação pendente (${movePending.length}). Confirme ou continue movendo.`;
+  renderCorredor();
+  buildAllReports();
+}
+
+async function confirmMove() {
+  if(!movePending.length) { toggleMoveMode(); return; }
+  setSyncStatus('saving','Salvando...');
+  try {
+    for(const {from, to, fromData, toData} of movePending) {
+      // salvar destino
+      if(depot[to]) await savePaleteToDB(to, depot[to]);
+      else await deletePaletFromDB(to);
+      // salvar origem
+      if(depot[from]) await savePaleteToDB(from, depot[from]);
+      else await deletePaletFromDB(from);
+    }
+    setSyncStatus('ok','Salvo');
+    movePending = [];
+    toggleMoveMode();
+  } catch(e) {
+    setSyncStatus('error','Erro ao salvar');
+    alert('Erro ao salvar movimentações:\n'+e.message);
+  }
+}
+
+function cancelMove() {
+  // desfaz alterações locais
+  for(const {from, to, fromData, toData} of [...movePending].reverse()) {
+    if(fromData) depot[from] = fromData; else delete depot[from];
+    if(toData) depot[to] = toData; else delete depot[to];
+  }
+  movePending = [];
+  moveSource = null;
+  toggleMoveMode();
+  buildAllReports();
+}
+
+// ══════════════════════════════════════════════════════════════
+// MODAL PALETE
+// ══════════════════════════════════════════════════════════════
+function onCatChange() {
+  const cat=document.getElementById('mCat').value, iS=document.getElementById('mItem'), tS=document.getElementById('mTam');
+  iS.innerHTML='<option value="">— selecione —</option>';
+  tS.innerHTML='<option value="">— selecione —</option>';
+  if(cat&&db[cat]) { if(db[cat].items.length) db[cat].items.forEach(it=>iS.innerHTML+=`<option value="${it}">${it}</option>`); else iS.innerHTML='<option value="">Sem itens no banco</option>'; }
+}
+function onItemChange() {
+  const cat=document.getElementById('mCat').value, tS=document.getElementById('mTam');
+  tS.innerHTML='<option value="">— selecione —</option>';
+  if(cat&&db[cat]) { if(db[cat].tamanhos.length) db[cat].tamanhos.forEach(t=>tS.innerHTML+=`<option value="${t}">${t}</option>`); else tS.innerHTML='<option value="">Sem tamanhos no banco</option>'; }
+}
+function selStatus(s,el) { curStatus=s; document.querySelectorAll('.status-pill').forEach(p=>p.classList.remove('sel')); el.classList.add('sel'); }
+
+function openModal(cor,conj,pos) {
+  curKey = makeKey(cor,conj,pos);
+  const d = depot[curKey]||{};
+  document.getElementById('modalTitle').textContent = makeLabel(cor,conj,pos);
+  document.getElementById('mCat').value = d.cat||''; onCatChange();
+  if(d.item) document.getElementById('mItem').value = d.item; onItemChange();
+  if(d.tam) document.getElementById('mTam').value = d.tam;
+  document.getElementById('mQtd').value = d.qtd||'';
+  document.getElementById('mObs').value = d.obs||'';
+  curStatus = d.status||'none';
+  document.querySelectorAll('.status-pill').forEach(p => {
+    p.classList.remove('sel');
+    if(p.textContent.trim()==='Normal'&&curStatus==='none') p.classList.add('sel');
+    if(p.textContent.trim()==='TRP'&&curStatus==='trp') p.classList.add('sel');
+    if(p.textContent.trim()==='Descarga'&&curStatus==='desc') p.classList.add('sel');
+  });
+  document.getElementById('modalBg').classList.add('open');
+}
+function closeModal() { document.getElementById('modalBg').classList.remove('open'); curKey=null; }
+
+async function saveP() {
+  if(!curKey) return;
+  const cat = document.getElementById('mCat').value;
+  if(!cat) { alert('Selecione uma categoria.'); return; }
+  const data = {
+    cat, item:document.getElementById('mItem').value||'',
+    tam:document.getElementById('mTam').value||'',
+    qtd:parseInt(document.getElementById('mQtd').value)||0,
+    obs:document.getElementById('mObs').value.trim(), status:curStatus
+  };
+  const keyToSave = curKey;
+  depot[keyToSave] = data;
+  closeModal(); renderCorredor(); buildAllReports();
+  await savePaleteToDB(keyToSave, data);
+}
+
+async function clearP() {
+  if(!curKey) return;
+  const k = curKey;
+  delete depot[k];
+  closeModal(); renderCorredor(); buildAllReports();
+  await deletePaletFromDB(k);
+}
+
+// ══════════════════════════════════════════════════════════════
+// RELATÓRIOS
+// ══════════════════════════════════════════════════════════════
+function buildAllReports() { buildInv(); buildTrp(); buildDesc(); populateInvFilters(); }
+function getEntries(sf) {
+  return Object.entries(depot)
+    .filter(([,d])=>sf===null?(d.status==='none'||!d.status):d.status===sf)
+    .sort((a,b)=>a[0].localeCompare(b[0]));
+}
+function populateInvFilters() {
+  const cats=[...new Set(getEntries(null).map(([,d])=>d.cat))];
+  const fCat=document.getElementById('fInvCat'), sc=fCat.value;
+  fCat.innerHTML='<option value="">Todas as categorias</option>';
+  cats.forEach(c=>{if(catInfo[c])fCat.innerHTML+=`<option value="${c}">${catInfo[c].label}</option>`;});
+  if(sc)fCat.value=sc;
+}
+function buildInv() {
+  const entries=getEntries(null), totals={}, counts={};
+  Object.keys(catInfo).forEach(k=>{totals[k]=0;counts[k]=0;});
+  entries.forEach(([,d])=>{if(catInfo[d.cat]){totals[d.cat]+=d.qtd||0;counts[d.cat]++;}});
+  document.getElementById('summaryCards').innerHTML=Object.entries(catInfo).map(([k,v])=>`<div class="s-card"><div class="s-label">${v.label}</div><div class="s-val" style="color:${v.text}">${totals[k]}</div><div class="s-sub">${counts[k]} palete${counts[k]!==1?'s':''}</div></div>`).join('');
+  renderInvTable(entries);
+}
+function clearInvFilters() {
+  document.getElementById('fInvCat').value='';
+  document.getElementById('fInvItem').innerHTML='<option value="">Todos os itens</option>';
+  document.getElementById('fInvTam').innerHTML='<option value="">Todos os tamanhos</option>';
+  document.getElementById('searchInv').value='';
+  renderInvTable(getEntries(null));
+}
+function filterInv() {
+  const q=document.getElementById('searchInv').value.toLowerCase();
+  const fCat=document.getElementById('fInvCat').value, fItem=document.getElementById('fInvItem').value, fTam=document.getElementById('fInvTam').value;
+  const iS=document.getElementById('fInvItem'), tS=document.getElementById('fInvTam');
+  if(fCat&&db[fCat]) {
+    const pi=iS.value,pt=tS.value;
+    iS.innerHTML='<option value="">Todos os itens</option>'; db[fCat].items.forEach(it=>iS.innerHTML+=`<option value="${it}">${it}</option>`); if(pi)iS.value=pi;
+    tS.innerHTML='<option value="">Todos os tamanhos</option>'; db[fCat].tamanhos.forEach(t=>tS.innerHTML+=`<option value="${t}">${t}</option>`); if(pt)tS.value=pt;
+  } else { iS.innerHTML='<option value="">Todos os itens</option>'; tS.innerHTML='<option value="">Todos os tamanhos</option>'; }
+  let e=getEntries(null);
+  if(fCat)e=e.filter(([,d])=>d.cat===fCat);
+  if(fItem)e=e.filter(([,d])=>d.item===fItem);
+  if(fTam)e=e.filter(([,d])=>d.tam===fTam);
+  if(q)e=e.filter(([k,d])=>fmtLabel(k).toLowerCase().includes(q)||(d.item||'').toLowerCase().includes(q)||(catInfo[d.cat]?.label||'').toLowerCase().includes(q));
+  renderInvTable(e);
+}
+function renderInvTable(entries) {
+  const tbody=document.getElementById('invBody'), tfoot=document.getElementById('invFoot');
+  if(!entries.length){tbody.innerHTML=`<tr><td colspan="6" class="empty-state">Nenhum item encontrado.</td></tr>`;tfoot.innerHTML='';return;}
+  tbody.innerHTML=entries.map(([k,d])=>`<tr><td style="font-weight:500;font-size:11px">${fmtLabel(k)}</td><td>${catBadge(d)}</td><td>${d.item||'—'}</td><td>${d.tam||'—'}</td><td>${d.qtd||0}</td><td style="font-size:11px;color:#888">${d.obs||'—'}</td></tr>`).join('');
+  const total=entries.reduce((s,[,d])=>s+(d.qtd||0),0), paletes=entries.length;
+  const filtroAtivo=document.getElementById('fInvCat').value||document.getElementById('fInvItem').value||document.getElementById('fInvTam').value||document.getElementById('searchInv').value;
+  tfoot.innerHTML=`<tr class="total-row"><td colspan="3" style="font-size:11px;color:#888">${filtroAtivo?'Total filtrado':'Total geral'} — ${paletes} palete${paletes!==1?'s':''}</td><td></td><td style="font-size:14px;font-weight:500">${total}</td><td></td></tr>`;
+}
+function buildTrp(){trpSelected.clear();updateTrpBulk();renderTrpTable(getEntries('trp'));}
+function filterTrp(){const q=document.getElementById('searchTrp').value.toLowerCase();renderTrpTable(getEntries('trp').filter(([k,d])=>!q||fmtLabel(k).toLowerCase().includes(q)||(d.item||'').toLowerCase().includes(q)));}
+function renderTrpTable(e){
+  const tb=document.getElementById('trpBody');
+  if(!e.length){tb.innerHTML=`<tr><td colspan="8" class="empty-state">Nenhum item em TRP.</td></tr>`;return;}
+  tb.innerHTML=e.map(([k,d])=>`<tr><td><input type="checkbox" ${trpSelected.has(k)?'checked':''} onchange="toggleTrp('${k}',this)"/></td><td style="font-weight:500;font-size:11px">${fmtLabel(k)}</td><td>${catBadge(d)}</td><td>${d.item||'—'}</td><td>${d.tam||'—'}</td><td>${d.qtd||0}</td><td style="font-size:11px;color:#888">${d.obs||'—'}</td><td><button class="approve-btn" onclick="approveOne('${k}')">Aprovar</button></td></tr>`).join('');
+}
+function buildDesc(){renderDescTable(getEntries('desc'));}
+function filterDesc(){const q=document.getElementById('searchDesc').value.toLowerCase();renderDescTable(getEntries('desc').filter(([k,d])=>!q||fmtLabel(k).toLowerCase().includes(q)||(d.item||'').toLowerCase().includes(q)));}
+function renderDescTable(e){
+  const tb=document.getElementById('descBody');
+  if(!e.length){tb.innerHTML=`<tr><td colspan="7" class="empty-state">Nenhum item para descarga.</td></tr>`;return;}
+  tb.innerHTML=e.map(([k,d])=>`<tr><td style="font-weight:500;font-size:11px">${fmtLabel(k)}</td><td>${catBadge(d)}</td><td>${d.item||'—'}</td><td>${d.tam||'—'}</td><td>${d.qtd||0}</td><td style="font-size:11px;color:#888">${d.obs||'—'}</td><td><button class="discard-btn" onclick="confirmDiscard('${k}')">Confirmar descarte</button></td></tr>`).join('');
+}
+function toggleTrp(k,el){if(el.checked)trpSelected.add(k);else trpSelected.delete(k);updateTrpBulk();}
+function toggleSelectAll(){const all=document.getElementById('trpSelectAll').checked;getEntries('trp').forEach(([k])=>{if(all)trpSelected.add(k);else trpSelected.delete(k);});buildTrp();}
+function updateTrpBulk(){document.getElementById('trpBulkCount').textContent=`${trpSelected.size} selecionado${trpSelected.size!==1?'s':''}`;document.getElementById('trpBulkBar').classList.toggle('visible',trpSelected.size>0);}
+async function approveOne(k){if(!depot[k])return;depot[k].status='none';buildAllReports();renderCorredor();await updateStatusDB(k,'none');}
+async function approveSelected(){const keys=[...trpSelected];keys.forEach(k=>{if(depot[k])depot[k].status='none';});trpSelected.clear();buildAllReports();renderCorredor();for(const k of keys)await updateStatusDB(k,'none');}
+async function confirmDiscard(k){if(!confirm('Confirmar descarte definitivo?'))return;delete depot[k];buildAllReports();renderCorredor();await deletePaletFromDB(k);}
+
+// ══════════════════════════════════════════════════════════════
+// EXPORT
+// ══════════════════════════════════════════════════════════════
+function exportTable(type,fmt) {
+  const sm={inv:null,trp:'trp',desc:'desc'};
+  const e=getEntries(sm[type]);
+  const rows=[['Identificação','Categoria','Item','Tamanho','Quantidade','Observações']];
+  e.forEach(([k,d])=>rows.push([fmtLabel(k),catInfo[d.cat]?.label||d.cat,d.item||'',d.tam||'',d.qtd||0,d.obs||'']));
+  const nm={inv:'inventario',trp:'trp',desc:'descarga'};
+  const fn=`${nm[type]}_${new Date().toISOString().slice(0,10)}`;
+  if(fmt==='xlsx'){const ws=XLSX.utils.aoa_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Dados');XLSX.writeFile(wb,fn+'.xlsx');}
+  else{const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn+'.csv';a.click();}
+}
+
+// ══════════════════════════════════════════════════════════════
+// BANCO DE DADOS
+// ══════════════════════════════════════════════════════════════
+function buildDbCatTabs(){document.getElementById('dbCatTabs').innerHTML=Object.entries(catInfo).map(([k,v])=>`<span class="db-cat-tab${k===dbActiveCat?' active':''}" onclick="setDbCat('${k}')">${v.label}</span>`).join('');}
+function setDbCat(k){dbActiveCat=k;buildDbCatTabs();renderDbLists();}
+function renderDbLists(){
+  const v=catInfo[dbActiveCat];
+  document.getElementById('dbCatName').textContent=v.label;document.getElementById('dbCatName2').textContent=v.label;
+  const items=db[dbActiveCat].items,tams=db[dbActiveCat].tamanhos;
+  document.getElementById('dbItemList').innerHTML=items.length?items.map(it=>`<span class="db-tag">${it}<span class="db-tag-del" onclick="delDbItem('${it.replace(/'/g,"\\'")}')">×</span></span>`).join(''):'<span class="db-empty">Nenhum item.</span>';
+  document.getElementById('dbTamList').innerHTML=tams.length?tams.map(t=>`<span class="db-tag">${t}<span class="db-tag-del" onclick="delDbTam('${t.replace(/'/g,"\\'")}')">×</span></span>`).join(''):'<span class="db-empty">Nenhum tamanho.</span>';
+}
+async function addDbItem(){const inp=document.getElementById('dbNewItem'),val=inp.value.trim();if(!val)return;if(db[dbActiveCat].items.includes(val)){alert('Já existe.');return;}if(!confirm(`Adicionar "${val}" em ${catInfo[dbActiveCat].label}?`))return;try{await sbUpsert('banco_itens',{cat:dbActiveCat,tipo:'item',valor:val});db[dbActiveCat].items.push(val);inp.value='';renderDbLists();}catch(e){alert('Erro: '+e.message);}}
+async function addDbTam(){const inp=document.getElementById('dbNewTam'),val=inp.value.trim();if(!val)return;if(db[dbActiveCat].tamanhos.includes(val)){alert('Já existe.');return;}if(!confirm(`Adicionar tamanho "${val}" em ${catInfo[dbActiveCat].label}?`))return;try{await sbUpsert('banco_itens',{cat:dbActiveCat,tipo:'tamanho',valor:val});db[dbActiveCat].tamanhos.push(val);inp.value='';renderDbLists();}catch(e){alert('Erro: '+e.message);}}
+async function delDbItem(it){if(!confirm(`Remover "${it}" de ${catInfo[dbActiveCat].label}?`))return;try{await sbDelete('banco_itens',`cat=eq.${encodeURIComponent(dbActiveCat)}&tipo=eq.item&valor=eq.${encodeURIComponent(it)}`);db[dbActiveCat].items=db[dbActiveCat].items.filter(x=>x!==it);renderDbLists();}catch(e){alert('Erro: '+e.message);}}
+async function delDbTam(t){if(!confirm(`Remover tamanho "${t}" de ${catInfo[dbActiveCat].label}?`))return;try{await sbDelete('banco_itens',`cat=eq.${encodeURIComponent(dbActiveCat)}&tipo=eq.tamanho&valor=eq.${encodeURIComponent(t)}`);db[dbActiveCat].tamanhos=db[dbActiveCat].tamanhos.filter(x=>x!==t);renderDbLists();}catch(e){alert('Erro: '+e.message);}}
+function handleImport(event){const file=event.target.files[0];if(!file)return;const ext=file.name.split('.').pop().toLowerCase();if(ext==='csv'){const r=new FileReader();r.onload=e=>parseImportData(e.target.result);r.readAsText(file,'UTF-8');}else{const r=new FileReader();r.onload=e=>{const wb=XLSX.read(e.target.result,{type:'binary'});parseImportData(XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]));};r.readAsBinaryString(file);}event.target.value='';}
+function parseImportData(csv){const lines=csv.trim().split('\n').map(l=>l.split(',').map(c=>c.trim().replace(/^"|"$/g,'')));const h=lines[0].map(x=>x.toLowerCase()),ci=h.indexOf('categoria'),ii=h.indexOf('item'),ti=h.indexOf('tamanho');if(ci<0||ii<0){alert('Colunas "categoria" e "item" não encontradas.');return;}importBuffer=[];const cm={};Object.entries(catInfo).forEach(([k,v])=>{cm[v.label.toLowerCase()]=k;cm[k]=k;});lines.slice(1).forEach(row=>{const ck=cm[(row[ci]||'').toLowerCase()],item=(row[ii]||'').trim(),tam=ti>=0?(row[ti]||'').trim():'';if(ck&&item)importBuffer.push({catKey:ck,item,tam});});if(!importBuffer.length){alert('Nenhuma linha válida.');return;}const prev=document.getElementById('importPreview');prev.style.display='block';prev.innerHTML=`<strong>${importBuffer.length} entradas:</strong><br>`+importBuffer.slice(0,10).map(r=>`${catInfo[r.catKey].label} → ${r.item}${r.tam?' ('+r.tam+')':''}`).join('<br>')+(importBuffer.length>10?`<br>...e mais ${importBuffer.length-10}`:'');document.getElementById('importActions').style.display='flex';}
+async function confirmImport(){if(!importBuffer.length)return;if(!confirm(`Importar ${importBuffer.length} entradas?`))return;let added=0;for(const{catKey,item,tam}of importBuffer){if(item&&!db[catKey].items.includes(item)){try{await sbUpsert('banco_itens',{cat:catKey,tipo:'item',valor:item});db[catKey].items.push(item);added++;}catch(e){}}if(tam&&!db[catKey].tamanhos.includes(tam)){try{await sbUpsert('banco_itens',{cat:catKey,tipo:'tamanho',valor:tam});db[catKey].tamanhos.push(tam);}catch(e){}}}alert(`${added} itens adicionados.`);cancelImport();renderDbLists();}
+function cancelImport(){importBuffer=[];document.getElementById('importPreview').style.display='none';document.getElementById('importActions').style.display='none';}
+
+// ══════════════════════════════════════════════════════════════
+// ADMINISTRAÇÃO — USUÁRIOS
+// ══════════════════════════════════════════════════════════════
+async function loadUsers() {
+  try {
+    const users = await sbSelect('usuarios','select=*&order=login.asc');
+    const tbody = document.getElementById('userTableBody');
+    tbody.innerHTML = users.map(u => {
+      const cors = Array.isArray(u.corredores_permitidos) ? u.corredores_permitidos.join(', ') : '—';
+      const badge = u.perfil==='admin' ? 'badge-admin' : u.perfil==='chefe' ? 'badge-chefe' : 'badge-operador';
+      const ativo = u.ativo ? '<span style="color:#27500A;font-size:11px">Ativo</span>' : '<span style="color:#A32D2D;font-size:11px">Inativo</span>';
+      return `<tr><td style="font-weight:500">${u.login}</td><td><span class="perfil-badge ${badge}">${u.perfil}</span></td><td style="font-size:11px;color:#666">${u.perfil==='chefe'?cors:'—'}</td><td>${ativo}</td><td><button class="btn" onclick="openEditUserModal(${u.id})">Editar</button></td></tr>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+function openNewUserModal() {
+  document.getElementById('userModalTitle').textContent = 'Novo usuário';
+  document.getElementById('editUserId').value = '';
+  document.getElementById('uLogin').value = '';
+  document.getElementById('uSenha').value = '';
+  document.getElementById('uPerfil').value = 'operador';
+  document.getElementById('senhaHint').style.display = 'none';
+  document.getElementById('deactivateUserBtn').style.display = 'none';
+  buildCorredorChecks([]);
+  toggleCorredoresSection();
+  document.getElementById('userModalBg').classList.add('open');
+}
+
+async function openEditUserModal(id) {
+  try {
+    const users = await sbSelect('usuarios',`id=eq.${id}&select=*`);
+    if(!users.length) return;
+    const u = users[0];
+    document.getElementById('userModalTitle').textContent = 'Editar usuário';
+    document.getElementById('editUserId').value = u.id;
+    document.getElementById('uLogin').value = u.login;
+    document.getElementById('uSenha').value = '';
+    document.getElementById('uPerfil').value = u.perfil;
+    document.getElementById('senhaHint').style.display = 'inline';
+    document.getElementById('deactivateUserBtn').style.display = 'block';
+    document.getElementById('deactivateUserBtn').textContent = u.ativo ? 'Desativar usuário' : 'Reativar usuário';
+    const cors = Array.isArray(u.corredores_permitidos) ? u.corredores_permitidos : [];
+    buildCorredorChecks(cors);
+    toggleCorredoresSection();
+    document.getElementById('userModalBg').classList.add('open');
+  } catch(e) { alert('Erro: '+e.message); }
+}
+
+function buildCorredorChecks(selected) {
+  const grid = document.getElementById('corredorChecks');
+  grid.innerHTML = ['A','B','C','D','E','F','G','H','I','J'].map(c => {
+    const checked = selected.includes(c);
+    return `<div class="corredor-check${checked?' checked':''}" onclick="toggleCorCheck(this,'${c}')">${c}</div>`;
+  }).join('');
+}
+
+function toggleCorCheck(el, cor) {
+  el.classList.toggle('checked');
+}
+
+function toggleCorredoresSection() {
+  const show = document.getElementById('uPerfil').value === 'chefe';
+  document.getElementById('corredoresSection').style.display = show ? 'block' : 'none';
+}
+
+async function saveUser() {
+  const id = document.getElementById('editUserId').value;
+  const login = document.getElementById('uLogin').value.trim();
+  const senha = document.getElementById('uSenha').value;
+  const perfil = document.getElementById('uPerfil').value;
+  if(!login) { alert('Digite um login.'); return; }
+  if(!id && !senha) { alert('Digite uma senha para o novo usuário.'); return; }
+  if(senha && senha.length < 6) { alert('Senha mínima de 6 caracteres.'); return; }
+  const cors = [...document.getElementById('corredorChecks').querySelectorAll('.checked')].map(el=>el.textContent.trim());
+  try {
+    if(id) {
+      // editar
+      const update = { login, perfil, corredores_permitidos: JSON.stringify(cors) };
+      if(senha) update.senha_hash = await sha256(senha);
+      await sbPatch('usuarios',`id=eq.${id}`,update);
+    } else {
+      // novo
+      const hash = await sha256(senha);
+      await sbInsert('usuarios',{ login, senha_hash:hash, perfil, corredores_permitidos:cors, ativo:true });
+    }
+    closeUserModal();
+    loadUsers();
+  } catch(e) { alert('Erro ao salvar usuário:\n'+e.message); }
+}
+
+async function toggleUserActive() {
+  const id = document.getElementById('editUserId').value;
+  if(!id) return;
+  try {
+    const users = await sbSelect('usuarios',`id=eq.${id}&select=ativo`);
+    const novoStatus = !users[0].ativo;
+    if(!confirm(`${novoStatus?'Reativar':'Desativar'} este usuário?`)) return;
+    await sbPatch('usuarios',`id=eq.${id}`,{ativo:novoStatus});
+    closeUserModal(); loadUsers();
+  } catch(e) { alert('Erro: '+e.message); }
+}
+
+function closeUserModal() { document.getElementById('userModalBg').classList.remove('open'); }
+
+// ══════════════════════════════════════════════════════════════
+// BACKUP
+// ══════════════════════════════════════════════════════════════
+function snapshotData() {
+  return { paletes: depot, layouts: Object.fromEntries(Object.entries(layouts).map(([k,v])=>[k,{ncols:v.ncols,portoes:[...v.portoes]}])), banco: db };
+}
+
+async function createBackup(tipo) {
+  setSyncStatus('saving','Criando backup...');
+  try {
+    const dados = snapshotData();
+    const desc = tipo==='auto' ? 'Backup automático diário' : `Backup manual — ${currentUser?.login||'sistema'}`;
+    await sbInsert('backups',{ dados, descricao:desc, criado_por:currentUser?.login||'sistema' });
+    // manter só os 30 últimos
+    const all = await sbSelect('backups','select=id&order=criado_em.desc');
+    if(all.length > 30) {
+      const toDelete = all.slice(30).map(b=>b.id);
+      for(const bid of toDelete) await sbDelete('backups',`id=eq.${bid}`);
+    }
+    setSyncStatus('ok','Backup criado');
+    if(tipo==='manual') loadBackups();
+  } catch(e) { setSyncStatus('error','Erro no backup'); console.error(e); }
+}
+
+async function loadBackups() {
+  try {
+    const list = await sbSelect('backups','select=id,criado_em,criado_por,descricao&order=criado_em.desc&limit=30');
+    const container = document.getElementById('backupList');
+    if(!list.length) { container.innerHTML='<p style="font-size:13px;color:#888">Nenhum backup encontrado.</p>'; return; }
+    container.innerHTML = list.map(b => {
+      const dt = new Date(b.criado_em).toLocaleString('pt-BR');
+      return `<div class="backup-item">
+        <div class="backup-info"><div class="backup-date">${dt}</div><div class="backup-desc">${b.descricao||'—'} · por ${b.criado_por||'—'}</div></div>
+        <div class="backup-actions">
+          <button class="btn" onclick="restoreBackup(${b.id})">Restaurar</button>
+          <button class="btn danger" onclick="deleteBackup(${b.id})">Excluir</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function restoreBackup(id) {
+  if(!confirm('Restaurar este backup? Os dados atuais serão substituídos. Esta ação não pode ser desfeita.')) return;
+  try {
+    const backs = await sbSelect('backups',`id=eq.${id}&select=dados`);
+    if(!backs.length) { alert('Backup não encontrado.'); return; }
+    const snap = backs[0].dados;
+    // restaurar depot
+    depot = snap.paletes || {};
+    // restaurar layouts
+    layouts = {};
+    Object.entries(snap.layouts||{}).forEach(([k,v])=>{ layouts[k]={ncols:v.ncols||27, portoes:new Set(v.portoes||[])}; });
+    // restaurar banco
+    db = {}; Object.keys(catInfo).forEach(k=>{ db[k]={items:[],tamanhos:[]}; });
+    Object.entries(snap.banco||{}).forEach(([k,v])=>{ if(db[k]) db[k]=v; });
+    // salvar tudo no Supabase
+    setSyncStatus('saving','Restaurando...');
+    for(const [key,data] of Object.entries(depot)) await savePaleteToDB(key,data);
+    for(const [cor,lay] of Object.entries(layouts)) await saveLayoutToDB(cor);
+    setSyncStatus('ok','Restaurado');
+    renderCorredor(); buildAllReports();
+    alert('Backup restaurado com sucesso!');
+  } catch(e) { alert('Erro ao restaurar: '+e.message); }
+}
+
+async function deleteBackup(id) {
+  if(!confirm('Excluir este backup permanentemente?')) return;
+  try { await sbDelete('backups',`id=eq.${id}`); loadBackups(); }
+  catch(e) { alert('Erro: '+e.message); }
+}
+
+async function checkDailyBackup() {
+  try {
+    const today = new Date().toISOString().slice(0,10);
+    const key = `lastBackup_${today}`;
+    if(localStorage.getItem(key)) return; // já fez hoje
+    await createBackup('auto');
+    localStorage.setItem(key,'1');
+  } catch(e) { console.error('Backup diário falhou:', e); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// NAVEGAÇÃO
+// ══════════════════════════════════════════════════════════════
+function showPanel(name, e) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  e.target.classList.add('active');
+  if(name==='inventario'){buildInv();populateInvFilters();}
+  if(name==='trp')buildTrp();
+  if(name==='descarga')buildDesc();
+  if(name==='db'){buildDbCatTabs();renderDbLists();}
+  if(name==='admin')loadUsers();
+  if(name==='backup')loadBackups();
+}
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  document.getElementById('loadingOverlay').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+});
+</script>
+</body>
+</html>
